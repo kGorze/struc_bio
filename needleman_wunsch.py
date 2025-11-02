@@ -12,8 +12,10 @@ do the Hirschberg and the Affine gap(gotoh)
 what should be the traceback in the NW?
 
 1. fill the wavefront anitidiagonal
-2. traceback on the CPU and generate many paths
+2. traceback on the CPU and generate many paths\
 """
+
+# TODO: use the pybenchmark to compare the performance of the code in each iteration of the DP.
 
 import numpy as np
 import typing
