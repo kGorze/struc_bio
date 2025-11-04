@@ -15,171 +15,189 @@ what should be the traceback in the NW?
 2. traceback on the CPU and generate many paths\
 """
 
-# TODO: use the pybenchmark to compare the performance of the code in each iteration of the DP.
+# TODO: use the pybenchmark to compare the performance of the code in each iteration of the DP. didn't have time for the rest right now. maybe I will come back to it later.
 
 import numpy as np
-import typing
+import sys
+import argparse
 from read_fasta import read_fasta
 
-class ResultObject:
-    def __init__(self, align1: str, align2: str, score: int = 0):
+gap = -2
+match = 1
+mismatch = -1
+
+
+class result_object:
+    def __init__(self, align1, align2, score=0):
         self.align1 = align1
         self.align2 = align2
         self.score = score
 
-    def change_score(self, score: int):
+    def change_score(self, score):
         self.score = score
 
 
 def print_matrix(a, n, m):
     for i in range(n):
         for j in range(m):
-            print(a[i, j], end=" ")
-        print()
-    print()
+            print(a[i, j], "\n")
+        print("\n")
+    print("\n")
 
 
-def needleman_wunsch(seq1: str,
-                     seq2: str,
-                     gap: int = -2,
-                     match: int = 1,
-                     mismatch: int = -1) -> np.ndarray:
+def needleman_wunsch(seq1, seq2, gap=-2, match=1, mismatch=-1):
     seq1_len = len(seq1) + 1
     seq2_len = len(seq2) + 1
-
-    array = np.zeros((seq2_len, seq1_len), dtype=int)
-
+    array = np.zeros((seq2_len, seq1_len))
     for i in range(seq2_len):
         array[i, 0] = gap * i
     for j in range(seq1_len):
         array[0, j] = gap * j
-
     for i in range(1, seq2_len):
         for j in range(1, seq1_len):
             if seq2[i - 1] == seq1[j - 1]:
                 score_diag = array[i - 1, j - 1] + match
             else:
                 score_diag = array[i - 1, j - 1] + mismatch
-
             score_up = array[i - 1, j] + gap
             score_left = array[i, j - 1] + gap
             array[i, j] = max(score_diag, score_up, score_left)
-
     return array
 
 
-def align_sequences(seq1: str,
-                    seq2: str,
-                    array: np.ndarray,
-                    match: int,
-                    mismatch: int,
-                    gap: int) -> typing.List[ResultObject]:
+def align_sequences(seq1, seq2, array, match, mismatch, gap, max_alignments=None):
     n = len(seq1)
     m = len(seq2)
-    results: typing.List[ResultObject] = []
+    results = []
     final_score = array[m, n]
-    dfs(n, m, "", "", results, seq1, seq2, array, match, mismatch, gap, final_score)
+    if max_alignments:
+        max_to_pass = max_alignments
+    else:
+        max_to_pass = sys.maxsize
+    dfs(n, m, "", "", results, seq1, seq2, array, match, mismatch, gap, final_score, max_to_pass)
     return results
 
 
-def dfs(i: int,
-        j: int,
-        align1: str,
-        align2: str,
-        results: typing.List[ResultObject],
-        seq1: str,
-        seq2: str,
-        array: np.ndarray,
-        match: int,
-        mismatch: int,
-        gap: int,
-        final_score: int):
+def dfs(i, j, align1, align2, results, seq1, seq2, array, match, mismatch, gap, final_score, max_alignments=10000):
+    if len(results) >= max_alignments: return
+    result_seq1 = align1[::-1]
+    result_seq2 = align2[::-1]
+    res = result_object(result_seq1, result_seq2, final_score)
     if i == 0 and j == 0:
-        res = ResultObject(align1[::-1], align2[::-1], final_score)
         results.append(res)
         return
-
     curr_score = array[j, i]
-
     if i > 0 and j > 0:
-        score_diag = array[j - 1, i - 1] + (match if seq1[i - 1] == seq2[j - 1] else mismatch)
+        if seq1[i - 1] == seq2[j - 1]:
+            score_diag = array[j - 1, i - 1] + match
+        else:
+            score_diag = array[j - 1, i - 1] + mismatch
         if curr_score == score_diag:
-            dfs(i - 1, j - 1, align1 + seq1[i - 1], align2 + seq2[j - 1], results, seq1, seq2, array, match, mismatch, gap, final_score)
-
+            dfs(i - 1, j - 1, align1 + seq1[i - 1], align2 + seq2[j - 1], results, seq1, seq2, array, match, mismatch,
+                gap, final_score, max_alignments)
+        if len(results) >= max_alignments:
+            return
     if i > 0:
         score_left = array[j, i - 1] + gap
         if curr_score == score_left:
-            dfs(i - 1, j, align1 + seq1[i - 1], align2 + "-", results, seq1, seq2, array, match, mismatch, gap, final_score)
+            dfs(i - 1, j, align1 + seq1[i - 1], align2 + "-", results, seq1, seq2, array, match, mismatch, gap,
+                final_score, max_alignments)
 
     if j > 0:
         score_up = array[j - 1, i] + gap
         if curr_score == score_up:
-            dfs(i, j - 1, align1 + "-", align2 + seq2[j - 1], results, seq1, seq2, array, match, mismatch, gap, final_score)
+            dfs(i, j - 1, align1 + "-", align2 + seq2[j - 1], results, seq1, seq2, array, match, mismatch, gap,
+                final_score, max_alignments)
 
 
+def calculate_pair_file(file):
+    # this only has a file which has the two sequences in on fasta file. those are parsed and aligned.
+    sequences = read_fasta(file)
+    sequence_1 = sequences[0]
+    sequence_2 = sequences[1]
+    all_alignments = calculate_needleman_wunsch(sequence_1, sequence_2, gap, match, mismatch)
+    save_scores_to_file(all_alignments)
+    print_scores(all_alignments)
 
-gap = -2
-match = 1
-mismatch = -1
 
-sequences_1 = read_fasta("rcsb_pdb_8V8S.fasta")
-sequences_2 = read_fasta("rcsb_pdb_8V91.fasta")
+def calculate_from_files(file1, file2):
+    sequence_1 = choose_from_many_sequences(file1)
+    sequence_2 = choose_from_many_sequences(file2)
+    all_alignments = calculate_needleman_wunsch(sequence_1, sequence_2, gap, match, mismatch)
+    save_scores_to_file(all_alignments)
+    print_scores(all_alignments)
 
-seq1 = sequences_1[0]
-seq2 = sequences_2[0]
 
-def calcualte_pair_file():
-    pass
-def calculate_from_files():
-    pass
-def choose_from_many_sequqnces():
-    pass
-
-def save_scores_to_file():
-    with open("scores.txt", "w") as f:
-        for r in best_alignments:
+def save_scores_to_file(all_allignments):
+    with open("output.txt", "w") as f:
+        for r in all_allignments:
             f.write(f"score: {r.score}\n")
             f.write(f"{r.align1}\n")
-            f.write(f"{r.align2}\n")
-            f.write("\n")
-
-def print_scores():
-    best_score = max(r.score for r in all_alignments)
-    best_alignments = [r for r in all_alignments if r.score == best_score]
-
-    print(f"Number of optimal alignments: {len(all_alignments)}")
-    for r in best_alignments:
-        print("score:", r.score)
-        print(r.align1)
-        print(r.align2)
-        print()
-
-array = needleman_wunsch(seq1, seq2,
-                         gap=gap,
-                         match=match,
-                         mismatch=mismatch)
-
-all_alignments = align_sequences(seq1, seq2, array,
-                                 match=match,
-                                 mismatch=mismatch,
-                                 gap=gap)
-
-print_matrix(array, array.shape[0], array.shape[1])
+            f.write(f"{r.align2}\n\n")
 
 
+def print_scores(all_alignments):
+    if len(all_alignments) == 0: return
+    best_score = 0
+    for r in all_alignments:
+        if r.score > best_score:
+            best_score = r.score
+    best_alignments = all_alignments[0]
+    for r in all_alignments:
+        if r.score == best_score:
+            best_alignments = r
+            break
+
+    print(f"found: {len(all_alignments)}")
+    print(f"best score: {best_score}")
+    display_count = min(5, len(all_alignments))
+    for idx in range(display_count):
+        print(f"alignemnt {idx + 1}:")
+        print(all_alignments[idx].align1)
+        print(all_alignments[idx].align2, "\n")
 
 
+def calculate_needleman_wunsch(seq1, seq2, gap, math, mismath, max_alignments=100):
+    array = needleman_wunsch(seq1, seq2, gap=gap, match=match, mismatch=mismatch)
+    all_alignments = align_sequences(seq1, seq2, array, match=match, mismatch=mismatch, gap=gap,
+                                     max_alignments=max_alignments)
+    return all_alignments
 
+def choose_from_many_sequences(file):
+	sequences = read_fasta(file)
+	for i, seq in enumerate(sequences):
+		print(f"{i}: {seq}")
+	choice = int(input("choose the sequence: "))
+	sequence = sequences[choice]
+	return sequence
 
 
 if __name__ == "__main__":
-    if(len(args) == 2):
-        sequences_1 = read_fasta(f"{arg1}")
-        sequences_2 = read_fasta(f"{arg2}")
-        if(len(sequences_1) > 1):
-            seq_1 = choose_from_many_sequqnces(sequences_1)
-        if(len(sequences_2) > 1):
-            seq_2 = choose_from_many_sequqnces(sequences_2)
-        calcualte_pair_file(seq1,seq2)
-    if(len(args) == 1):
-        calculate_from_pair()
+    parser = argparse.ArgumentParser()
+    parser.add_argument('fasta_file', nargs='?')
+    parser.add_argument('fasta_file2', nargs='?')
+    parser.add_argument('--fasta', dest='fasta_flag')
+    args = parser.parse_args()
+    if args.fasta_flag:
+        fasta_file = args.fasta_flag
+    else:
+        fasta_file = args.fasta_file
+    if not fasta_file: sys.exit(1)
+    if args.fasta_file2:
+        sequence_1 = choose_from_many_sequences(fasta_file)
+        sequence_2 = choose_from_many_sequences(args.fasta_file2)
+    else:
+        sequences = read_fasta(fasta_file)
+        if len(sequences) < 2:
+            sys.exit(1)
+        if len(sequences) > 2:
+            sequence_1 = choose_from_many_sequences(fasta_file)
+            sequence_2 = choose_from_many_sequences(fasta_file)
+        else:
+            sequence_1 = sequences[0]
+            sequence_2 = sequences[1]
+    print(f"sequence_1 len:{len(sequence_1)}")
+    print(f"sequence_2 len:{len(sequence_2)}")
+    all_alignments = calculate_needleman_wunsch(sequence_1, sequence_2, gap, match, mismatch)
+    save_scores_to_file(all_alignments)
+    print_scores(all_alignments)
