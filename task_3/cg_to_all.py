@@ -19,6 +19,7 @@ def load_templates():
         template = pdb.get_structure(nuc, f"templates/{nuc}.pdb")
         templates[nuc] = list(template.get_residues())[0]
     return templates
+ 
 input_file = sys.argv[1]
 output_file = sys.argv[2]
 templates= load_templates()
@@ -29,6 +30,7 @@ rec_structure.add(rec_model)
 rec_chain = PDB.Chain.Chain("A")
 rec_model.add(rec_chain)
 sup = Bio.PDB.Superimposer()
+
 for residue_cg in cg_structure.get_residues():
     res_name = residue_cg.get_resname().strip()
     if res_name not in templates:
@@ -49,6 +51,7 @@ for residue_cg in cg_structure.get_residues():
     all_at = list(temp_copy.get_atoms())
     sup.apply(all_at)
     rec_chain.add(temp_copy)
+    
 io = PDB.PDBIO()
 io.set_structure(rec_structure)
 io.save(output_file)

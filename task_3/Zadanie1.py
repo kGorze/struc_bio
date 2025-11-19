@@ -2,6 +2,7 @@ import numpy as np
 from Bio.PDB import PDBList
 from Bio import PDB
 import matplotlib.pyplot as plt
+
 pdb1=PDBList()
 fetch_pdb = pdb1.retrieve_pdb_file('4YWO', file_format='pdb')
 parser = PDB.PDBParser()
