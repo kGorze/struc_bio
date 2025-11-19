@@ -8,19 +8,19 @@ pyrimidines_at = ["N1", "C2", "C4"]
 backbone = ["P", "C4'"]
 
 class AtomSelector(PDB.Select):
-    def verify(self, atom):
-        name = atom.get_name()
+    def accept_atom(self, atom):
+        name = atom.get_name().strip()
         res = atom.get_parent()
         res_name = res.get_resname().strip()
         if name in backbone:
-            return True
+            return 1
         if res_name in purines:
             if name in purine_at:
-                return True
+                return 1
         elif res_name in pyrimidines:
             if name in pyrimidines_at:
-                return True
-        return False
+                return 1
+        return 0
 if len(sys.argv) < 3:
     print("Podaj plik wejsciowy i wyjsciowy")
     sys.exit(1)
