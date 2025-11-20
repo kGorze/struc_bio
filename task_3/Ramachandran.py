@@ -2,14 +2,12 @@ import numpy as np
 from Bio.PDB import PDBList, calc_dihedral
 from Bio import PDB
 import matplotlib.pyplot as plt
-
 pdb1=PDBList()
 fetch_pdb = pdb1.retrieve_pdb_file('4YWO', file_format='pdb')
 parser = PDB.PDBParser()
 structure = parser.get_structure('4YWO', 'yw/pdb4ywo.ent')
 phi_list = []
 psi_list = []
-
 for model in structure:
     for chain in model:
         res=[resid for resid in chain if resid.id[0] == ' ']
@@ -43,4 +41,7 @@ for model in structure:
                 psi_list.append(np.degrees(psi))
 
 plt.scatter(phi_list, psi_list, s=10, alpha=0.5)
+plt.title("Wykres Ramachandrana")
+plt.xlabel("Kąt $\phi$")
+plt.ylabel("Kąt $\psi$")
 plt.show()
